@@ -1,6 +1,7 @@
 // 추가로 책에 있는 코드와 성능비교한번해보자. 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define LEFT_POS 1
 #define RIGHT_POS 2
@@ -13,11 +14,11 @@
 #define L_POS 0x2
 #define R_POS 0x1
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 #define DATA int
 
 typedef unsigned int uint32_t;
-typedef unsigned int int32_t;
+typedef signed long int32_t;
 
 // AVL Tree Node
 typedef struct _AVL_Node {
@@ -81,36 +82,33 @@ int32_t calcHeightDiffer ( AVL_manage *manage, AVL_Node *newNode, AVL_Node **rot
 // rotation Tree
 void rightRotation ( AVL_manage *manage, AVL_Node *eventNode );
 void leftRotation ( AVL_manage *manage, AVL_Node *eventNode ); 
-uint32_t nodeMax ( AVL_Node *node );
+uint32_t max ( uint32_t a, uint32_t b );
 // search 
 
 // print
-void printAVL ( AVL_Node *node );
-
+void printAVL ( AVL_Node *node , AVL_Node *root);
+// delete AVL Tree
+void deleteAVL ( AVL_manage *manage );
+void deleteTree ( AVL_Node *node );
 int main ()
 {
+	srand(time(NULL));
 	AVL_manage *manage = (AVL_manage *) malloc ( sizeof (AVL_manage) );
 	initAVL ( manage );
 	//
 	int i = 0;
-	if ( !insertAVLNode(manage, createAVLNode ( 1 ) ) ) 
+	DATA testInput[] = { 50, 25, 75, 10, 35, 70, 85, 5, 15, 30, 42, 60, 72, 80, 95, 13, 28, 31, 40, 32 };
+	for ( i ; i < 1000 ; i++)
 	{
-		printf ("[main] %d func", i);
-		return 0;
-	}
-	if ( !insertAVLNode(manage, createAVLNode ( 2 ) ) ) 
-	{
-		printf ("[main] %d func", i);
-		return 0;
-	}
-	if ( !insertAVLNode(manage, createAVLNode ( 3 ) ) ) 
-	{
-		printf ("[main] %d func", i);
-		return 0;
+		insertAVLNode(manage, createAVLNode ( (rand()%2000) ) );	
 	}
 	// print
-	printAVL ( manage->root_ptr );
-	
+	//printAVL ( manage->root_ptr , manage->root_ptr);
+	printf ("Tree에는 총 %u개의 Node가 존재합니다.\n ", manage->numberOfNode);
+	printf ("Tree는 %u의 높이입니다.\n", manage->heightOfTree);
+	printf ("root: ( %u, {%d} %u)\n", manage->root_ptr->leftTreeHeight, manage->root_ptr->value, manage->root_ptr->rightTreeHeight);
+	//
+	deleteAVL (manage);
 	return 0;
 }
 // init 
@@ -151,7 +149,7 @@ AVL_Node *createAVLNode ( DATA value )
 uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 {
 	#ifdef DEBUG_MODE
-	printf ("------------ [insertAVLNode] newNode(%d) start ------------\n", newNode->value);
+	printf ("\n------------ [insertAVLNode] newNode(%d) start ------------\n", newNode->value);
 	#endif
 	/*
 		1. 삽입될 위치까지 찾아간다.
@@ -179,11 +177,11 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 	// new Node가 삽입될 position 찾기.
 	AVL_Node *parent = insert_search ( manage, newNode );
 	#ifdef DEBUG_MODE
-	printf ("insert_search / newNode(%d) / parent = %d \n", newNode->value, parent->value);
+	printf ("insert_search_call: newNode(%d) : parent = %d \n", newNode->value, parent->value);
 	#endif
 	if ( parent == NULL )
 	{	// 이미 중복된 값이 있는 경우 
-		printf ("[insertAVLNode] %d 값은 이미 Tree에 존재합니다.\n");
+		//printf ("[insertAVLNode] %d 값은 이미 Tree에 존재합니다.\n");
 		return 0;
 	}
 	// parent의 left or right 결정 및 newNode linking 
@@ -203,9 +201,6 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 			return 0;
 		}
 	}
-	// 여기 링킹까지 한 상태이다. 여기서 디버그해야함. !  
-	printAVL ( manage->root_ptr );
-	printf ("\n");
 	// height 및 differ 값 계산
 	uint32_t rotateInfo = 0;
 	AVL_Node *rotatePos = NULL;
@@ -215,6 +210,10 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 		exit(1);
 	}
 	// rotate
+	#ifdef DEBUG_MODE
+	printAVL( manage->root_ptr , manage->root_ptr);
+	printf ("\n");
+	#endif
 	if ( rotateInfo != 0 )
 	{	// 회전이 필요한 경우 
 		switch ( rotateInfo )
@@ -222,7 +221,7 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 			case LL_ROTATE :
 			{	//	LL 회전 
 				// balance깨진 eventNode에서 right 회전 
-				#ifdef DEBUG_MOD
+				#ifdef DEBUG_MODE
 				printf ("[insertAVLNode] : LL_ROTATE !\n");
 				#endif
 				rightRotation( manage, rotatePos );
@@ -232,7 +231,7 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 			{	// LR 회전 
 				// [1] balance 깨진 eventNode의 leftNode를 left 회전 
 				// [2] balance 깨진 eventNode를 right 회전
-				#ifdef DEBUG_MOD
+				#ifdef DEBUG_MODE
 				printf ("[insertAVLNode] : LR_ROTATE !\n");
 				#endif
 				leftRotation( manage, rotatePos->left_ptr ); 
@@ -242,7 +241,7 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 			case RR_ROTATE : 
 			{	// RR 회전 
 				// balance 깨진 eventNode를 left 회전
-				#ifdef DEBUG_MOD
+				#ifdef DEBUG_MODE
 				printf ("[insertAVLNode] : RR_ROTATE !\n");
 				#endif
 				leftRotation( manage, rotatePos ); 
@@ -252,7 +251,7 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 			{	// RL 회전 
 				// [1] : balance 깨진 eventNode의 rightNode를 right 회전 
 				// [2] : balance 깨진 eventNode를 left회전
-				#ifdef DEBUG_MOD
+				#ifdef DEBUG_MODE
 				printf ("[insertAVLNode] : RL_ROTATE !\n");
 				#endif
 				rightRotation( manage, rotatePos->right_ptr );
@@ -261,7 +260,7 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 			}
 		}
 		// Left Tree Height and Right Tree Height 비교
-		if ( rotatePos->leftTreeHeight != rotatePos->rightTreeHeight )
+		if ( rotatePos->parent_ptr->leftTreeHeight != rotatePos->parent_ptr->rightTreeHeight )
 		{
 			printf ("[insertAVLNode] : after Rotate, balance Error!\n");
 			exit (1);
@@ -270,7 +269,7 @@ uint32_t insertAVLNode ( AVL_manage *manage, AVL_Node *newNode )
 	// 삽입 성공 
 	return 1;
 	#ifdef DEBUG_MODE
-	printf ("------------ [insertAVLNode] newNode(%d) end ------------\n", newNode->value);
+	printf ("\n------------ [insertAVLNode] newNode(%d) end ------------\n", newNode->value);
 	#endif
 }
 /*
@@ -309,10 +308,12 @@ int32_t insert_linkNode ( AVL_Node *parent, AVL_Node *newNode, uint32_t directio
 	if ( direction == RIGHT_POS )
 	{
 		parent->right_ptr = newNode;
+		newNode->parent_ptr = parent;
 	}
 	else if ( direction == LEFT_POS )
 	{
 		parent->left_ptr = newNode;
+		newNode->parent_ptr = parent;
 	}
 	else 
 		return 0;	// 비정상 
@@ -353,12 +354,14 @@ int32_t calcHeightDiffer ( AVL_manage *manage, AVL_Node *newNode, AVL_Node **rot
 	tmp1 = tmp;
 	tmp = newNode->parent_ptr;
 	int32_t res = 0;
+	//
 	while ( ( tmp != NULL ) && ( manage->root_ptr != tmp1 ) )	
 	{	// root이상으로 가면 멈춘다. 
+	
 		if ( tmp->left_ptr == tmp1 )
 		{	// 이전의 위치가 Left Tree 
-			prevPath << 2;
-			prevPath = prevPath | L_POS;
+			prevPath = prevPath << 2;
+			prevPath = prevPath + L_POS;
 			// calc height 
 			/* 이거 어렵다. 이전 노드의 높이 값을 계속해서 비교하며 올라갈까? 그러다가 높이값이 증가하지 않으면 differ는 발생하지 않으므*/
 			/* height차이는 삽입된 위치에서 올라가다보면 높이가 같아진다면 loop를 종료해도 댄다. 하지만 1이라도 차이가 난다면 계속 올라가야함. */
@@ -366,14 +369,15 @@ int32_t calcHeightDiffer ( AVL_manage *manage, AVL_Node *newNode, AVL_Node **rot
 		}
 		else if ( tmp->right_ptr == tmp1 )
 		{	// 이전의 위치가 Right Tree 
-			prevPath << 2;
-			prevPath = prevPath | R_POS;
+			prevPath = prevPath << 2;
+			prevPath = prevPath + R_POS;
 			// calc height 
 			tmp->rightTreeHeight = prevHeight + 1;
 		}
 		// calc differ
 		res = tmp->leftTreeHeight - tmp->rightTreeHeight;
-		tmp->differOfHeight = ( ( res < 0 ) ? -1 * res : res );
+		tmp->differOfHeight = ( ( res < 0 ) ? -res : res );
+		//
 		if ( tmp->differOfHeight == 0 )
 		{	// 해당 서브트리는 균형 이진트리이다. (회전이 필요없다.)
 			// tmp의 parent node로 갈 필요가 없는 이유는 이미 이전에 tmp->parent는 해당 방향의 height가 최신화된 상태이기 때문이다. 
@@ -397,29 +401,30 @@ int32_t calcHeightDiffer ( AVL_manage *manage, AVL_Node *newNode, AVL_Node **rot
 	// root에서 멈춘 경우, height확인 필요
 	if ( ( tmp == NULL ) && ( manage->root_ptr == tmp1 ) ) 
 	{	// root까지 올라오면서 differ >= 2인 경우는 없는 상황이지만 subtree의 height는 커짐. 
-		manage->numberOfNode++;
 		// AVL Tree Height Info 최신화
 		// root의 right Sub Tree가 더 높은 경우 
 		if ( tmp1->rightTreeHeight > tmp1->leftTreeHeight ) 
+		{
 			manage->heightOfTree = tmp1->rightTreeHeight;
+		}
 		else 
-			// root의 left Sub Tree가 더 높은 경우. 
+		{	// root의 left Sub Tree가 더 높은 경우. 
 			manage->heightOfTree = tmp1->leftTreeHeight;
+		}
 	}
 	// [이거 제대로 동작하는지 확인 필요]
 	if ( *rotatePos != NULL )
 	{	// 회전이 필요한 경우 이전, 이전의 이전의 순서가 LR, LL, RR, RL이 맞는지 확인필요 아마 맞을 것이다. 
+		
 		if ( ( prevPath & L_POS ) > 0 )
 		{	// 이전에 Left Tree에서 온 경우 
 			if ( ( ( prevPath >> 2 ) & L_POS ) > 0 )
 			{	// LL
 				*rotateInfo = LL_ROTATE;
-				return 1; 
 			}
 			else if ( ( ( prevPath >> 2 ) & R_POS ) > 0 )
 			{	// LR
 				*rotateInfo = LR_ROTATE;
-				return 1; 
 			}
 		}
 		else if ( ( prevPath & R_POS ) > 0 )
@@ -427,37 +432,45 @@ int32_t calcHeightDiffer ( AVL_manage *manage, AVL_Node *newNode, AVL_Node **rot
 			if ( ( ( prevPath >> 2 ) & L_POS ) > 0 )
 			{	// RL
 				*rotateInfo = RL_ROTATE;
-				return 1;
 			}
 			else if ( ( ( prevPath >> 2 ) & R_POS ) > 0 )
 			{	// RR
 				*rotateInfo = RR_ROTATE;
-				return 1;
 			}
+		}
+		else
+		{	// error !
+			printf ("[calcHeightDiffer] : rotatePos logic Error\n");
+			return 0;
 		}
 	}
 	else
 	{	// 회전이 필요없는 경우 
 		*rotateInfo = 0;
-		return 1;
 	} 
+	manage->numberOfNode++;
+	return 1;
 }
 // rotation Tree
 /* 여기 디버그 확인 */
 void rightRotation ( AVL_manage *manage, AVL_Node *eventNode )
 {
 	#ifdef DEBUG_MODE
-	printf (" Right Rotation !\n");
+	printf (" Right Rotation !, eventNode(%d)\n", eventNode->value);
 	#endif
 	// eventNode가 root인지 확인해야 한다.
 	AVL_Node *node2 = eventNode->left_ptr;
-	AVL_Node *moveNode = eventNode->left_ptr->right_ptr;
+	AVL_Node *moveNode = node2->right_ptr;
 	AVL_Node *parentNode = eventNode->parent_ptr;	// NULL => eventNode = root
 	// [1] moveNode
 	if ( moveNode != NULL )
 	{
 		eventNode->left_ptr = moveNode;
 		moveNode->parent_ptr = eventNode;	
+	}
+	else
+	{
+		eventNode->left_ptr = NULL;
 	}
 	// [2] node2
 	eventNode->parent_ptr = node2;
@@ -487,16 +500,28 @@ void rightRotation ( AVL_manage *manage, AVL_Node *eventNode )
 		}
 	}
 	// eventNode height
-	uint32_t eventHeight = nodeMax ( eventNode );
-	// node2 Height
-	node2->rightTreeHeight = eventHeight + 1;
-	// node2의 left and right Sub Tree의 Height가 같은 것은 indesertAVLNode에서 비교 
+	if ( moveNode != NULL )
+	{
+		eventNode->leftTreeHeight = max ( moveNode->leftTreeHeight, moveNode->rightTreeHeight ) + 1;
+	}
+	else
+	{
+		eventNode->leftTreeHeight = 0;
+	}
+	// node2 height
+	node2->rightTreeHeight = max ( node2->right_ptr->leftTreeHeight, node2->right_ptr->rightTreeHeight ) + 1;
+	// 확인
+	#ifdef DEBUG_MODE
+	printf ("Right Rotation Check \n");
+	printAVL ( manage->root_ptr, manage->root_ptr );
+	printf ("\n");
+	#endif 
 }
 /* 여기 디버그 확인 */
 void leftRotation ( AVL_manage *manage, AVL_Node *eventNode )
 {
 	#ifdef DEBUG_MODE
-	printf (" Left Rotation !\n");
+	printf (" Left Rotation, eventNode(%d) !\n", eventNode->value);
 	#endif
 	AVL_Node *node2 = eventNode->right_ptr;
 	AVL_Node *moveNode = node2->left_ptr;
@@ -506,6 +531,10 @@ void leftRotation ( AVL_manage *manage, AVL_Node *eventNode )
 	{
 		eventNode->right_ptr = moveNode;
 		moveNode->parent_ptr = eventNode;
+	}
+	else
+	{
+		eventNode->right_ptr = NULL;
 	}
 	// [2] node2
 	node2->left_ptr = eventNode;
@@ -518,15 +547,15 @@ void leftRotation ( AVL_manage *manage, AVL_Node *eventNode )
 	}
 	else
 	{	// root가 아닌 경우 
-		if ( parentNode->leftTreeHeight == eventNode )
+		if ( parentNode->left_ptr == eventNode )
 		{	// eventNode가 parent의 Left Sub Tree 
 			node2->parent_ptr = parentNode;
-			parentNode->leftTreeHeight = node2;
+			parentNode->left_ptr = node2;
 		}
-		else if ( parentNode->rightTreeHeight == eventNode )
+		else if ( parentNode->right_ptr == eventNode )
 		{	// eventNode가 parent의 Right Sub Tree 
 			node2->parent_ptr = parentNode;
-			parentNode->rightTreeHeight = node2;
+			parentNode->right_ptr = node2;
 		}
 		else
 		{	// 예외가 거의 있을 수 없다. 
@@ -534,64 +563,57 @@ void leftRotation ( AVL_manage *manage, AVL_Node *eventNode )
 			return;
 		}
 	}
-	// height
-	uint32_t eventHeight = nodeMax ( eventNode );
-	node2->leftTreeHeight = eventHeight + 1;
-}
-// 해당 node의 left and right sub tree의 크기 비교 
-/* 여기 디버그 확인 */
-uint32_t nodeMax ( AVL_Node *node )
-{
-	uint32_t res = 0;
-	// node right height
-	AVL_Node *right = node->right_ptr;
-	if ( right != NULL )
+	// eventNode height
+	if ( moveNode != NULL )
 	{
-		if ( right->rightTreeHeight > right->leftTreeHeight )
-		{
-			node->rightTreeHeight = right->rightTreeHeight + 1;
-			res = ( res > node->rightTreeHeight ? res : node->rightTreeHeight );
-		}
-		else
-		{
-			node->rightTreeHeight = right->leftTreeHeight + 1;
-			res = ( res > node->rightTreeHeight ? res : node->rightTreeHeight );
-		}
+		eventNode->rightTreeHeight = max ( moveNode->leftTreeHeight, moveNode->rightTreeHeight ) + 1;
 	}
 	else
-	{	// NULL 인 경우 
-		node->rightTreeHeight = 0;
-	}
-	// node left height
-	AVL_Node *left = node->left_ptr;
-	if ( left != NULL )
 	{
-		if ( left->rightTreeHeight > left->leftTreeHeight )
-		{
-			node->leftTreeHeight = left->rightTreeHeight;
-			res = ( res > node->leftTreeHeight ? res : node->leftTreeHeight );
-		}
-		else
-		{
-			node->leftTreeHeight = left->leftTreeHeight;
-			res = ( res > node->leftTreeHeight ? res : node->leftTreeHeight );
-		}
+		eventNode->rightTreeHeight = 0;
 	}
-	else
-	{	// NULL 인 경우 
-		node->leftTreeHeight = 0;
-	}
-	return res; 
+	// node2 height
+	node2->leftTreeHeight = max ( node2->left_ptr->leftTreeHeight, node2->left_ptr->rightTreeHeight ) + 1;
+	// 확인
+	#ifdef DEBUG_MODE
+	printf ("Left Rotation Check \n");
+	printAVL ( manage->root_ptr, manage->root_ptr );
+	printf ("\n");
+	#endif 
+	
 }
 // print
-void printAVL ( AVL_Node *node )
+void printAVL ( AVL_Node *node , AVL_Node *root)
 {
-	if ( node->left_ptr != NULL ) printAVL ( node->left_ptr );
-	printf (" %d[LH : %d, RH : %d]", node->value, node->leftTreeHeight, node->rightTreeHeight);
-	if ( node->right_ptr != NULL ) printAVL ( node->right_ptr );
+	if ( node->left_ptr != NULL ) printAVL ( node->left_ptr , root);
+	if ( node != root ) printf (" ( %d [%d] %d )", node->leftTreeHeight, node->value, node->rightTreeHeight);
+	else printf (" ( %d {{%d}} %d )", node->leftTreeHeight, node->value, node->rightTreeHeight);
+	if ( node->right_ptr != NULL ) printAVL ( node->right_ptr , root);
 }
-
-
+// max
+uint32_t max ( uint32_t a, uint32_t b )
+{
+	if ( a > b )
+	{
+		return a;
+	}
+	else
+	{
+		return b;
+	}
+}
+// delete AVL Tree
+void deleteAVL ( AVL_manage *manage )
+{
+	deleteTree ( manage->root_ptr );
+	free ( manage );
+}
+void deleteTree ( AVL_Node *node )
+{
+	if ( node->left_ptr != NULL ) deleteTree ( node->left_ptr );
+	if ( node->right_ptr != NULL ) deleteTree ( node->right_ptr );
+	free (node);
+}
 
 
 
